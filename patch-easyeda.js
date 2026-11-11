@@ -48,7 +48,8 @@ function patchSource(src, file) {
   const m1 = src.match(/"TEXTAREA"!=e\.target\.tagName&&\(!(\w+)\|\|!(\w+)\.dragpanning\)/);
   const m2 = src.match(/var \w+=(\w+)\.getViewBox\(\),\w+=20\/(\w+)/);
   const m3 = src.match(/var (\w+)=(\w+)\("ZoomWay"\);void 0===\1&&\(\1="ScrollKey"\)/);
-  const m4 = src.match(/function nr\(e\)\{/);
+  // 함수 이름은 파일마다 다르므로, 휠 핸들러를 내용(TEXTAREA + dragpanning 검사)으로 식별
+  const m4 = src.match(/function \w+\(e\)\{(?=if\("TEXTAREA"!=e\.target\.tagName&&\(!\w+\|\|!\w+\.dragpanning\))/);
   const m5 = src.match(/a=1===e\.deltaMode,o=100;/);
   if (!m1 || !m2 || !m3 || !m4 || !m5) {
     throw new Error(`${file}: 패치 위치를 찾지 못함 (EasyEDA 버전이 달라졌을 수 있음)`);
@@ -66,12 +67,15 @@ function patchSource(src, file) {
   );
 
   // 4) 수식키 없는 픽셀 스크롤은 직접 처리: 부드러운 2축 이동
+  // PCB 의 setViewBox 는 무거우므로, 휠 이벤트를 모아 프레임당 1회만 반영 (rAF 합치기)
   const inject =
     `${MARK}if(!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.deltaMode&&"TEXTAREA"!=e.target.tagName&&(!${W}||!${J}.dragpanning)){` +
     `e.preventDefault();` +
+    `var __g=window.__tp||(window.__tp={x:0,y:0,p:0});__g.x+=e.deltaX;__g.y+=e.deltaY;` +
+    `if(!__g.p){__g.p=1;requestAnimationFrame(function(){__g.p=0;` +
     `var __v=${VB}.getViewBox(),__s=document.getElementById("root"),__w=__s&&__s.getBoundingClientRect().width,` +
     `__f=(__w?__v[2]/__w:1/${UE})*${CONFIG.PAN_SPEED};` +
-    `__v[0]+=e.deltaX*__f;__v[1]+=e.deltaY*__f;${VB}.setViewBox(__v);return}`;
+    `__v[0]+=__g.x*__f;__v[1]+=__g.y*__f;__g.x=__g.y=0;${VB}.setViewBox(__v)})}return}`;
   src = src.replace(m4[0], m4[0] + inject);
   return src;
 }
