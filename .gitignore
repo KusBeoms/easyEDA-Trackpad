@@ -1,0 +1,8 @@
+# gitignore 이다.
+
+# Claude
+.claude/
+.omc/
+
+# Visual Studio Code
+.vscode/
